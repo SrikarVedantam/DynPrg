@@ -1,7 +1,7 @@
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const NUM_ITEMS: i32 = 35; // A reasonable value for exhaustive search.
+const NUM_ITEMS: i32 = 20; // A reasonable value for exhaustive search.
 
 const MIN_VALUE: i32 = 1;
 const MAX_VALUE: i32 = 10;
