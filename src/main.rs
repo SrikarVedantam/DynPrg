@@ -223,6 +223,96 @@ fn do_exhaustive_search(
     }
 }
 
+fn branch_and_bound(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Item>, i32, i32) {
+    let mut best_value = 0;
+    let (current_value, current_weight, remaining_value) = (0, 0, sum_values(items, true));
+    return do_branch_and_bound(
+        items,
+        allowed_weight,
+        0,
+        &mut best_value,
+        current_value,
+        current_weight,
+        remaining_value,
+    );
+}
+
+fn do_branch_and_bound(
+    items: &mut Vec<Item>,
+    allowed_weight: i32,
+    next_index: i32,
+    best_value: &mut i32,
+    current_value: i32,
+    current_weight: i32,
+    remaining_value: i32,
+) -> (Vec<Item>, i32, i32) {
+    let unext = next_index as usize;
+    if unext == items.len() {
+        // Reached full assignment
+        let items_copy = copy_items(items);
+        let sol_val = solution_value(items, allowed_weight);
+        return (items_copy, sol_val, 1);
+    } else {
+        // Check value bound
+        if current_value + remaining_value > (*best_value) {
+            let mut inc_items = vec![];
+            let mut inc_result_value = 0;
+            let mut inc_fn_calls = 0;
+            // Try including the current item
+            if current_weight + items[unext].weight <= allowed_weight {
+                items[unext].is_selected = true;
+                
+                (inc_items, inc_result_value, inc_fn_calls) = do_branch_and_bound(
+                    items,
+                    allowed_weight,
+                    next_index + 1,
+                    best_value,
+                    current_value + items[unext].value,
+                    current_weight + items[unext].weight,
+                    remaining_value - items[unext].value,
+                );
+
+                if inc_result_value > *best_value {
+                    *best_value = inc_result_value;
+                }
+            }
+
+            // Try excluding the current item
+            let mut exc_items = vec![];
+            let mut exc_result_value = 0;
+            let mut exc_fn_calls = 0;
+            
+            items[unext].is_selected = false;
+
+            if current_value + remaining_value - items[unext].value > *best_value {
+                (exc_items, exc_result_value, exc_fn_calls) = do_branch_and_bound(
+                    items,
+                    allowed_weight,
+                    next_index + 1,
+                    best_value,
+                    current_value,
+                    current_weight,
+                    remaining_value - items[unext].value,
+                );
+
+                if exc_result_value > *best_value {
+                    *best_value = exc_result_value;
+                }
+            }
+
+            let total_fn_calls = inc_fn_calls + exc_fn_calls;
+
+            if inc_result_value > exc_result_value {
+                return (inc_items, inc_result_value, total_fn_calls);
+            } else {
+                return (exc_items, exc_result_value, total_fn_calls);
+            }
+        } else {
+            return (Vec::new(), 0, 1);
+        }
+    }
+}
+
 fn main() {
     // Prepare a Prng using the same seed each time.
     let mut prng = Prng { seed: 1337 };
@@ -249,5 +339,12 @@ fn main() {
     } else {
         println!("*** Exhaustive Search ***");
         run_algorithm(&exhaustive_search, &mut items, allowed_weight);
+    }
+
+    if NUM_ITEMS > 40 {
+        println!("Too many items for Branch and Bound search\n");
+    } else {
+        println!("*** Branch and Bound ***");
+        run_algorithm(&branch_and_bound, &mut items, allowed_weight);
     }
 }
