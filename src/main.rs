@@ -1,7 +1,7 @@
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const NUM_ITEMS: i32 = 20; // A reasonable value for exhaustive search.
+const NUM_ITEMS: i32 = 35; // A reasonable value for exhaustive search.
 
 const MIN_VALUE: i32 = 1;
 const MAX_VALUE: i32 = 10;
@@ -300,7 +300,7 @@ fn do_branch_and_bound(
                 }
             }
 
-            let total_fn_calls = inc_fn_calls + exc_fn_calls;
+            let total_fn_calls = inc_fn_calls + exc_fn_calls + 1;
 
             if inc_result_value > exc_result_value {
                 return (inc_items, inc_result_value, total_fn_calls);
@@ -312,6 +312,8 @@ fn do_branch_and_bound(
         }
     }
 }
+
+
 
 fn main() {
     // Prepare a Prng using the same seed each time.
