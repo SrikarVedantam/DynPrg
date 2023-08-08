@@ -341,6 +341,7 @@ fn main() {
         run_algorithm(&exhaustive_search, &mut items, allowed_weight);
     }
 
+    // Branch and Bound search
     if NUM_ITEMS > 40 {
         println!("Too many items for Branch and Bound search\n");
     } else {
