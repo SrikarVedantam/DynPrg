@@ -2,6 +2,7 @@ use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const NUM_ITEMS: i32 = 20; // A reasonable value for exhaustive search.
+                           //const NUM_ITEMS: i32 = 35;    // A reasonable value for branch and bound.
 
 const MIN_VALUE: i32 = 1;
 const MAX_VALUE: i32 = 10;
@@ -250,8 +251,7 @@ fn do_branch_and_bound(
     if unext == items.len() {
         // Reached full assignment
         let items_copy = copy_items(items);
-        let sol_val = solution_value(items, allowed_weight);
-        return (items_copy, sol_val, 1);
+        return (items_copy, current_value, 1);
     } else {
         // Check value bound
         if current_value + remaining_value > (*best_value) {
@@ -261,7 +261,7 @@ fn do_branch_and_bound(
             // Try including the current item
             if current_weight + items[unext].weight <= allowed_weight {
                 items[unext].is_selected = true;
-                
+
                 (inc_items, inc_result_value, inc_fn_calls) = do_branch_and_bound(
                     items,
                     allowed_weight,
@@ -281,7 +281,7 @@ fn do_branch_and_bound(
             let mut exc_items = vec![];
             let mut exc_result_value = 0;
             let mut exc_fn_calls = 0;
-            
+
             items[unext].is_selected = false;
 
             if current_value + remaining_value - items[unext].value > *best_value {
@@ -313,7 +313,69 @@ fn do_branch_and_bound(
     }
 }
 
+// Use Dynamic Programming to find a solution
+fn dynamic_programming(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Item>, i32, i32) {
+    let mut solution_value = vec![vec![0; allowed_weight as usize + 1]; items.len()];
+    let mut prev_weight = vec![vec![0; allowed_weight as usize + 1]; items.len()];
 
+    for i in 0..=allowed_weight as usize {
+        // Item fits in
+        if items[0].weight <= i.try_into().unwrap() {
+            solution_value[0][i] = items[0].value;
+            prev_weight[0][i] = -1;
+        } else {
+            prev_weight[0][i] = i.try_into().unwrap();
+        }
+    }
+
+    for i in 1..NUM_ITEMS as usize {
+        for w in 0..=allowed_weight as usize {
+            // Item not included
+            let exc_value = solution_value[i - 1][w];
+            let remaining_weight = w as i32 - items[i].weight;
+            // Item included
+            if items[i].weight <= w.try_into().unwrap() {
+                let prev_best_value = solution_value[i - 1][remaining_weight as usize];
+                let curr_best_value = prev_best_value + items[i].value;
+
+                // Compare the values when item included vs item excluded
+                if curr_best_value > exc_value {
+                    solution_value[i][w] = curr_best_value;
+                    prev_weight[i][w] = remaining_weight;
+                } else {
+                    solution_value[i][w] = exc_value;
+                    prev_weight[i][w] = w.try_into().unwrap();
+                }
+            } else {
+                solution_value[i][w] = exc_value;
+                prev_weight[i][w] = w.try_into().unwrap();
+            }
+        }
+    }
+
+    for i in 0..NUM_ITEMS as usize {
+        items[i].is_selected = false;
+    }
+
+    let mut back_i = NUM_ITEMS - 1;
+    let mut back_w = allowed_weight;
+
+    while back_i >= 0 {
+        if back_w == prev_weight[back_i as usize][back_w as usize] {
+            items[back_i as usize].is_selected = false;
+        } else {
+            items[back_i as usize].is_selected = true;
+            back_w = prev_weight[back_i as usize][back_w as usize];
+        }
+        back_i = back_i - 1;
+    }
+
+    return (
+        copy_items(items),
+        solution_value[NUM_ITEMS as usize - 1][allowed_weight as usize],
+        1,
+    );
+}
 
 fn main() {
     // Prepare a Prng using the same seed each time.
@@ -350,4 +412,8 @@ fn main() {
         println!("*** Branch and Bound ***");
         run_algorithm(&branch_and_bound, &mut items, allowed_weight);
     }
+
+    // Dynamic programming
+    println!("*** Dynamic programming ***");
+    run_algorithm(&dynamic_programming, &mut items, allowed_weight);
 }
