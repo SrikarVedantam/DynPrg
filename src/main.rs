@@ -1,7 +1,7 @@
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const NUM_ITEMS: i32 = 20; // A reasonable value for exhaustive search.
+const NUM_ITEMS: i32 = 11; // A reasonable value for exhaustive search.
                            //const NUM_ITEMS: i32 = 35;    // A reasonable value for branch and bound.
 
 const MIN_VALUE: i32 = 1;
@@ -10,9 +10,12 @@ const MIN_WEIGHT: i32 = 4;
 const MAX_WEIGHT: i32 = 10;
 
 struct Item {
+    id: i32,
     value: i32,
     weight: i32,
     is_selected: bool,
+    blocked_by: i32,
+    block_list: Vec<i32>,
 }
 
 // ************
@@ -68,11 +71,14 @@ fn make_items(
     max_weight: i32,
 ) -> Vec<Item> {
     let mut items: Vec<Item> = Vec::with_capacity(num_items as usize);
-    for _ in 0..num_items {
+    for i in 0..num_items {
         let item = Item {
+            id: i,
             value: prng.next_i32(min_value, max_value),
             weight: prng.next_i32(min_weight, max_weight),
             is_selected: false,
+            blocked_by: -1,
+            block_list: Vec::new(),
         };
         items.push(item);
     }
@@ -84,9 +90,12 @@ fn copy_items(items: &mut Vec<Item>) -> Vec<Item> {
     let mut new_items: Vec<Item> = Vec::with_capacity(items.len());
     for item in items {
         let new_item = Item {
+            id: item.id,
             value: item.value,
             weight: item.weight,
             is_selected: item.is_selected,
+            blocked_by: item.blocked_by,
+            block_list: item.block_list.clone(),
         };
         new_items.push(new_item);
     }
@@ -313,6 +322,152 @@ fn do_branch_and_bound(
     }
 }
 
+
+// Build the items' block lists.
+fn make_block_lists(items: &mut Vec<Item>) {
+    for i in 0..items.len() {
+        items[i].block_list = Vec::new();
+        for j in 0..items.len() {
+            if i != j && items[i].value >= items[j].value && items[i].weight <= items[j].weight {
+                items[i].block_list.push(j.try_into().unwrap());
+            }
+        }
+    }
+}
+
+fn rods_technique(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Item>, i32, i32) {
+    let mut best_value = 0;
+    let (current_value, current_weight, remaining_value) = (0, 0, sum_values(items, true));
+
+    make_block_lists(items);
+    return do_rods_technique(
+        items,
+        allowed_weight,
+        0,
+        &mut best_value,
+        current_value,
+        current_weight,
+        remaining_value,
+    );
+}
+
+fn do_rods_technique(
+    items: &mut Vec<Item>,
+    allowed_weight: i32,
+    next_index: i32,
+    best_value: &mut i32,
+    current_value: i32,
+    current_weight: i32,
+    remaining_value: i32,
+) -> (Vec<Item>, i32, i32) {
+    let unext = next_index as usize;
+    if unext == items.len() {
+        // Reached full assignment
+        let items_copy = copy_items(items);
+        return (items_copy, current_value, 1);
+    } else {
+        // Check value bound
+        if current_value + remaining_value > (*best_value) {
+            let mut inc_items = vec![];
+            let mut inc_result_value = 0;
+            let mut inc_fn_calls = 0;
+
+            /*let mut test1_solution = Vec::new();
+            let mut test1_value = 0;
+            let mut test1_calls = 1;*/
+
+            // Try including the current item
+            if items[unext].blocked_by == -1 && current_weight + items[unext].weight <= allowed_weight {
+                items[unext].is_selected = true;
+
+                (inc_items, inc_result_value, inc_fn_calls) = do_rods_technique(
+                    items,
+                    allowed_weight,
+                    next_index + 1,
+                    best_value,
+                    current_value + items[unext].value,
+                    current_weight + items[unext].weight,
+                    remaining_value - items[unext].value,
+                );
+
+                if inc_result_value > *best_value {
+                    *best_value = inc_result_value;
+                }
+            }
+
+            // Try excluding the current item
+            let mut exc_items = vec![];
+            let mut exc_result_value = 0;
+            let mut exc_fn_calls = 0;
+
+            for item_idx in items[unext].block_list.clone() {
+                if items[item_idx as usize].blocked_by == -1 {
+                    items[item_idx as usize].blocked_by = next_index;
+                }
+            }
+
+            items[unext].is_selected = false;
+
+            if current_value + remaining_value - items[unext].value > *best_value {
+                (exc_items, exc_result_value, exc_fn_calls) = do_rods_technique(
+                    items,
+                    allowed_weight,
+                    next_index + 1,
+                    best_value,
+                    current_value,
+                    current_weight,
+                    remaining_value - items[unext].value,
+                );
+
+                if exc_result_value > *best_value {
+                    *best_value = exc_result_value;
+                }
+            }
+
+            for item_idx in items[unext].block_list.clone() {
+                if items[item_idx as usize].blocked_by == next_index {
+                    items[item_idx as usize].blocked_by = -1;
+                }
+            }
+
+            let total_fn_calls = inc_fn_calls + exc_fn_calls + 1;
+
+            if inc_result_value > exc_result_value {
+                return (inc_items, inc_result_value, total_fn_calls);
+            } else {
+                return (exc_items, exc_result_value, total_fn_calls);
+            }
+        } else {
+            return (Vec::new(), 0, 1);
+        }
+    }
+}
+
+fn rods_technique_sorted(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Item>, i32, i32) {
+    let mut best_value = 0;
+    let (current_value, current_weight, remaining_value) = (0, 0, sum_values(items, true));
+
+    make_block_lists(items);
+    items.sort_by(|a, b| b.block_list.len().cmp(&a.block_list.len()));
+
+    for i in 0..NUM_ITEMS {
+        items[i as usize].id = i;
+    }
+
+    make_block_lists(items);
+
+    return do_rods_technique(
+        items,
+        allowed_weight,
+        0,
+        &mut best_value,
+        current_value,
+        current_weight,
+        remaining_value,
+    );
+}
+
+
 // Use Dynamic Programming to find a solution
 fn dynamic_programming(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Item>, i32, i32) {
     let mut solution_value = vec![vec![0; allowed_weight as usize + 1]; items.len()];
@@ -411,6 +566,22 @@ fn main() {
     } else {
         println!("*** Branch and Bound ***");
         run_algorithm(&branch_and_bound, &mut items, allowed_weight);
+    }
+
+    // Rod's technique
+    if NUM_ITEMS > 60 {    // Only run Rod's technique if num_items is small enough.
+        println!("Too many items for Rod's technique\n");
+    } else {
+        println!("*** Rod's Technique ***");
+        run_algorithm(&rods_technique, &mut items, allowed_weight);
+    }
+
+    // Rod's technique
+    if NUM_ITEMS > 200 {    // Only run Rod's technique if num_items is small enough.
+        println!("Too many items for Rod's technique sorted\n");
+    } else {
+        println!("*** Rod's Technique Sorted ***");
+        run_algorithm(&rods_technique_sorted, &mut items, allowed_weight);
     }
 
     // Dynamic programming
