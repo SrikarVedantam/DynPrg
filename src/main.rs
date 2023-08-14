@@ -322,7 +322,6 @@ fn do_branch_and_bound(
     }
 }
 
-
 // Build the items' block lists.
 fn make_block_lists(items: &mut Vec<Item>) {
     for i in 0..items.len() {
@@ -377,7 +376,9 @@ fn do_rods_technique(
             let mut test1_calls = 1;*/
 
             // Try including the current item
-            if items[unext].blocked_by == -1 && current_weight + items[unext].weight <= allowed_weight {
+            if items[unext].blocked_by == -1
+                && current_weight + items[unext].weight <= allowed_weight
+            {
                 items[unext].is_selected = true;
 
                 (inc_items, inc_result_value, inc_fn_calls) = do_rods_technique(
@@ -466,7 +467,6 @@ fn rods_technique_sorted(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Ite
         remaining_value,
     );
 }
-
 
 // Use Dynamic Programming to find a solution
 fn dynamic_programming(items: &mut Vec<Item>, allowed_weight: i32) -> (Vec<Item>, i32, i32) {
@@ -569,7 +569,8 @@ fn main() {
     }
 
     // Rod's technique
-    if NUM_ITEMS > 60 {    // Only run Rod's technique if num_items is small enough.
+    if NUM_ITEMS > 60 {
+        // Only run Rod's technique if num_items is small enough.
         println!("Too many items for Rod's technique\n");
     } else {
         println!("*** Rod's Technique ***");
@@ -577,7 +578,8 @@ fn main() {
     }
 
     // Rod's technique
-    if NUM_ITEMS > 200 {    // Only run Rod's technique if num_items is small enough.
+    if NUM_ITEMS > 200 {
+        // Only run Rod's technique if num_items is small enough.
         println!("Too many items for Rod's technique sorted\n");
     } else {
         println!("*** Rod's Technique Sorted ***");
