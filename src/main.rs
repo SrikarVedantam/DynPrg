@@ -325,7 +325,9 @@ fn do_branch_and_bound(
 // Build the items' block lists.
 fn make_block_lists(items: &mut Vec<Item>) {
     for i in 0..items.len() {
-        items[i].block_list = Vec::new();
+        if !items[i].block_list.is_empty() {
+            items[i].block_list = Vec::new();
+        }
         for j in 0..items.len() {
             if i != j && items[i].value >= items[j].value && items[i].weight <= items[j].weight {
                 items[i].block_list.push(j.try_into().unwrap());
